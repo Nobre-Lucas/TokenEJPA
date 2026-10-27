@@ -1,0 +1,5 @@
+flask>=3.0
+
+# Necessaria apenas para TOKENEJPA_HTTPS=1 (certificado autoassinado usado
+# para liberar a camera do celular na rede local). Instalar sempre simplifica.
+cryptography

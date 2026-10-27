@@ -1,0 +1,25 @@
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+
+# Banco de dados local gerado em tempo de execucao (dados de teste)
+*.db
+*.db-journal
+
+# Binarios e instaladores
+*.deb
+*.exe
+
+# Editores / sistema operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Segredos e configuracao local
+.env

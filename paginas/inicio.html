@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TokenEJPA - PoC v03</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0b0f14; color: #e6edf3;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 24px 16px;
+  }
+  h1 { font-size: 1.2rem; margin: 8px 0 2px; }
+  p.sub { color: #9aa7b1; font-size: 0.85rem; margin: 0 0 28px; text-align: center; max-width: 420px; }
+  .cartoes { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 380px; }
+  a.cartao {
+    display: block; background: #131a21; border: 1px solid #232c35; border-radius: 12px;
+    padding: 18px; text-decoration: none; color: #e6edf3;
+  }
+  a.cartao b { display: block; font-size: 1.02rem; margin-bottom: 4px; }
+  a.cartao span { font-size: 0.82rem; color: #9aa7b1; }
+  a.cartao:active { background: #1a232c; }
+</style>
+</head>
+<body>
+<h1>TokenEJPA - PoC v03</h1>
+<p class="sub">Fluxo ponta a ponta: cadastro da pessoa &rarr; inscricao em curso &rarr; leitor de presenca com auto-inscricao.</p>
+<div class="cartoes">
+  <a class="cartao" href="/cadastro">
+    <b>1. Cadastro de pessoas</b>
+    <span>Cadastra uma pessoa (dados ficticios) e gera o QR Code unico dela.</span>
+  </a>
+  <a class="cartao" href="/inscricao">
+    <b>2. Inscricao em cursos</b>
+    <span>A pessoa (por matricula) se inscreve, ou nao, em cada curso de teste.</span>
+  </a>
+  <a class="cartao" href="/leitor">
+    <b>3. Leitor de presenca</b>
+    <span>Configura o evento e le o QR: confirma presenca ou inscreve automaticamente.</span>
+  </a>
+</div>
+</body>
+</html>

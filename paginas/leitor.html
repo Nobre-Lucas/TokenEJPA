@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TokenEJPA - Leitor de Presenca (PoC v03)</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0b0f14; color: #e6edf3;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh;
+  }
+  header { padding: 14px 16px 6px; text-align: center; }
+  header h1 { font-size: 1.05rem; margin: 0 0 4px; }
+  header p { font-size: 0.8rem; color: #9aa7b1; margin: 0; }
+  nav.voltar { font-size: 0.78rem; margin-bottom: 6px; }
+  nav.voltar a { color: #6bb0ff; text-decoration: none; }
+
+  #config {
+    max-width: 480px; width: calc(100% - 32px); margin: 10px 16px 4px;
+    display: flex; gap: 8px; align-items: center; font-size: 0.8rem; color: #9aa7b1;
+  }
+  #config select {
+    background: #131a21; border: 1px solid #232c35; color: #e6edf3;
+    border-radius: 6px; padding: 6px 8px; flex: 1;
+  }
+  #avisoCurso { color: #ff9a9a; font-size: 0.78rem; max-width: 480px; width: calc(100% - 32px); margin: 0 16px; min-height: 1.2em; }
+
+  #palco {
+    position: relative; width: 100%; max-width: 480px;
+    aspect-ratio: 3 / 4; background: #000; overflow: hidden;
+    border-radius: 12px; margin: 10px auto;
+  }
+  video { width: 100%; height: 100%; object-fit: cover; }
+  canvas#overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  #status {
+    max-width: 480px; width: 100%; text-align: center;
+    font-size: 0.85rem; color: #9aa7b1; padding: 0 16px; min-height: 1.4em;
+  }
+  #status.buscando { color: #6bb0ff; }
+  #status.erro { color: #ff6b6b; }
+
+  #resultado {
+    display: none; max-width: 480px; width: calc(100% - 32px);
+    margin: 14px 16px; border-radius: 12px; padding: 18px; text-align: center;
+  }
+  #resultado.mostrar { display: block; }
+  #resultado.ok { background: #10261a; border: 1px solid #1f6b3b; }
+  #resultado.nova { background: #10202f; border: 1px solid #1f4f6b; }
+  #resultado.repetida { background: #26210f; border: 1px solid #6b5a1f; }
+  #resultado.invalida { background: #26100f; border: 1px solid #6b1f1f; }
+  #resultado .rotulo { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  #resultado.ok .rotulo { color: #7fd99a; }
+  #resultado.nova .rotulo { color: #7fc4ff; }
+  #resultado.repetida .rotulo { color: #e0c96b; }
+  #resultado.invalida .rotulo { color: #ff9a9a; }
+  #resultado .nome { font-size: 1.3rem; font-weight: 700; margin: 6px 0 2px; }
+  #resultado .detalhe { font-size: 0.85rem; color: #9aa7b1; margin: 0 0 14px; }
+  #resultado button {
+    background: #2ea043; color: white; border: none; border-radius: 8px;
+    padding: 10px 28px; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  #resultado button:active { background: #278a3a; }
+
+  #historico { max-width: 480px; width: calc(100% - 32px); margin: 6px 16px 24px; }
+  #historico .cabecalho { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; gap: 8px; }
+  #historico h2 { font-size: 0.8rem; color: #9aa7b1; margin: 0; font-weight: 600; }
+  #historico .botoes { display: flex; gap: 6px; }
+  #historico button {
+    background: #131a21; border: 1px solid #232c35; color: #9aa7b1;
+    border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; cursor: pointer;
+  }
+  #historico button.perigo { color: #ffb3b3; border-color: #6b1f1f; }
+  #historico ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  #historico li { background: #131a21; border: 1px solid #232c35; border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; display: flex; flex-direction: column; }
+  #historico li.repetida { border-color: #6b5a1f; }
+  #historico li.nova { border-color: #1f4f6b; }
+  #historico li .linha1 { display: flex; justify-content: space-between; }
+  #historico li .curso { color: #6b7680; font-size: 0.75rem; }
+  #historico li span.hora { color: #6b7680; font-size: 0.75rem; }
+
+  #debug {
+    max-width: 480px; width: calc(100% - 32px); margin: 4px 16px 14px;
+    background: #131a21; border: 1px solid #232c35; border-radius: 8px;
+    padding: 10px 12px; font-size: 0.75rem; color: #9aa7b1;
+  }
+  #debug summary { cursor: pointer; color: #e6edf3; font-weight: 600; }
+  #debug pre {
+    white-space: pre-wrap; word-break: break-word; margin: 6px 0 0;
+    background: #0b0f14; padding: 8px; border-radius: 6px; font-family: monospace;
+    max-height: 140px; overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav class="voltar"><a href="/">&larr; inicio</a></nav>
+  <h1>TokenEJPA - Leitor de Presenca (PoC v03)</h1>
+  <p>Aponte a camera para o QR de identidade da pessoa</p>
+</header>
+
+<div id="config">
+  <label for="cursoEsperado">Registrando presencas do evento:</label>
+  <select id="cursoEsperado">
+    <option value="">(carregando cursos...)</option>
+  </select>
+</div>
+<div id="avisoCurso"></div>
+
+<div id="palco">
+  <video id="video" playsinline autoplay muted></video>
+  <canvas id="overlay"></canvas>
+</div>
+
+<div id="status">Selecione o evento e toque em "Iniciar camera"</div>
+
+<button id="btnIniciar" style="margin:10px; padding:10px 24px; font-size:1rem; border-radius:8px; border:none; background:#2563eb; color:#fff;">
+  Iniciar camera
+</button>
+
+<div id="resultado">
+  <div class="rotulo" id="resultadoRotulo">Presenca registrada</div>
+  <div class="nome" id="resultadoNome">-</div>
+  <div class="detalhe" id="resultadoDetalhe">-</div>
+  <button id="btnOk">OK, continuar lendo</button>
+</div>
+
+<div id="historico">
+  <div class="cabecalho">
+    <h2>Presencas deste evento</h2>
+    <div class="botoes">
+      <button id="btnExportar">Exportar CSV</button>
+      <button class="perigo" id="btnResetPresencas">Resetar presencas</button>
+    </div>
+  </div>
+  <ul id="listaHistorico"></ul>
+</div>
+
+<details id="debug">
+  <summary>Depuracao (ultimo QR lido)</summary>
+  <div>Conteudo bruto do QR:</div>
+  <pre id="dbgTexto">(nenhuma leitura ainda)</pre>
+  <div>Resposta do servidor:</div>
+  <pre id="dbgResposta">(nenhuma ainda)</pre>
+</details>
+
+<script>
+(function () {
+  "use strict";
+
+  const selectCurso = document.getElementById("cursoEsperado");
+  const avisoCurso = document.getElementById("avisoCurso");
+  const video = document.getElementById("video");
+  const overlay = document.getElementById("overlay");
+  const ctx = overlay.getContext("2d", { willReadFrequently: true });
+  const statusEl = document.getElementById("status");
+  const resultadoEl = document.getElementById("resultado");
+  const resultadoRotulo = document.getElementById("resultadoRotulo");
+  const resultadoNome = document.getElementById("resultadoNome");
+  const resultadoDetalhe = document.getElementById("resultadoDetalhe");
+  const btnOk = document.getElementById("btnOk");
+  const btnIniciar = document.getElementById("btnIniciar");
+  const btnExportar = document.getElementById("btnExportar");
+  const btnResetPresencas = document.getElementById("btnResetPresencas");
+  const listaHistorico = document.getElementById("listaHistorico");
+  const dbgTexto = document.getElementById("dbgTexto");
+  const dbgResposta = document.getElementById("dbgResposta");
+
+  const INTERVALO_MS = 250;
+
+  let escaneando = false;
+  let pausadoNoResultado = false;
+  let timerId = null;
+  let canvasRecorte = document.createElement("canvas");
+  let ctxRecorte = canvasRecorte.getContext("2d", { willReadFrequently: true });
+  let ultimoTextoLido = null;
+
+  function definirStatus(texto, classe) {
+    statusEl.textContent = texto;
+    statusEl.className = classe || "";
+  }
+
+  function desenharGuia() {
+    const w = overlay.width = video.videoWidth || overlay.clientWidth;
+    const h = overlay.height = video.videoHeight || overlay.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    const lado = Math.min(w, h) * 0.6;
+    const x = (w - lado) / 2;
+    const y = (h - lado) / 2;
+    ctx.strokeStyle = pausadoNoResultado ? "#2ea043" : "#6bb0ff";
+    ctx.lineWidth = Math.max(2, w * 0.006);
+    ctx.setLineDash([10, 6]);
+    ctx.strokeRect(x, y, lado, lado);
+    return { x, y, w: lado, h: lado };
+  }
+
+  async function carregarCursos() {
+    const resp = await fetch("/api/cursos");
+    const cursos = await resp.json();
+    selectCurso.innerHTML = "";
+    cursos.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.curso_id;
+      opt.textContent = c.nome + " (" + c.curso_id + ")";
+      selectCurso.appendChild(opt);
+    });
+    atualizarAvisoCurso();
+    carregarHistorico();
+  }
+
+  function atualizarAvisoCurso() {
+    avisoCurso.textContent = selectCurso.value
+      ? ""
+      : "Selecione um evento antes de iniciar a leitura.";
+  }
+
+  async function carregarHistorico() {
+    const cursoId = selectCurso.value;
+    if (!cursoId) { listaHistorico.innerHTML = ""; return; }
+    const resp = await fetch("/api/presencas?curso_id=" + encodeURIComponent(cursoId));
+    const presencas = await resp.json();
+    listaHistorico.innerHTML = "";
+    presencas.slice(0, 40).forEach((item) => {
+      const li = document.createElement("li");
+      if (item.auto_inscrita) li.className = "nova";
+      li.innerHTML =
+        "<div class='linha1'><span>" + item.nome + " (" + item.mat + ")" +
+        "</span><span class='hora'>" + item.hora + "</span></div>" +
+        "<div class='curso'>" + item.curso_nome + (item.auto_inscrita ? " - inscrita automaticamente" : "") + "</div>";
+      listaHistorico.appendChild(li);
+    });
+  }
+
+  async function cicloDeLeitura() {
+    if (!escaneando || pausadoNoResultado) return;
+
+    const regiao = desenharGuia();
+    if (regiao.w > 0 && regiao.h > 0) {
+      canvasRecorte.width = Math.round(regiao.w);
+      canvasRecorte.height = Math.round(regiao.h);
+      ctxRecorte.drawImage(video, regiao.x, regiao.y, regiao.w, regiao.h, 0, 0, regiao.w, regiao.h);
+
+      const imagem = ctxRecorte.getImageData(0, 0, canvasRecorte.width, canvasRecorte.height);
+      const achado = jsQR(imagem.data, imagem.width, imagem.height, { inversionAttempts: "attemptBoth" });
+
+      if (achado && achado.data && achado.data !== ultimoTextoLido) {
+        ultimoTextoLido = achado.data;
+        dbgTexto.textContent = achado.data;
+        definirStatus("QR encontrado, verificando no servidor...", "buscando");
+        await processarToken(achado.data);
+        return;
+      } else if (!achado) {
+        definirStatus("Procurando QR Code...", "buscando");
+      }
+    }
+    timerId = setTimeout(cicloDeLeitura, INTERVALO_MS);
+  }
+
+  async function processarToken(token) {
+    const cursoId = selectCurso.value;
+    try {
+      const resp = await fetch("/api/presenca", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, curso_id: cursoId }),
+      });
+      const dados = await resp.json();
+      dbgResposta.textContent = JSON.stringify(dados, null, 2);
+      mostrarResultado(dados);
+    } catch (err) {
+      dbgResposta.textContent = "Erro de rede: " + err.message;
+      definirStatus("Falha ao falar com o servidor: " + err.message, "erro");
+      timerId = setTimeout(cicloDeLeitura, INTERVALO_MS);
+    }
+  }
+
+  function mostrarResultado(dados) {
+    pausadoNoResultado = true;
+
+    if (dados.status === "invalido") {
+      resultadoEl.className = "resultado mostrar invalida";
+      resultadoRotulo.textContent = "QR invalido - presenca NAO registrada";
+      resultadoNome.textContent = "-";
+      resultadoDetalhe.textContent = dados.motivo || "Motivo desconhecido.";
+      definirStatus("QR invalido.", "erro");
+      return;
+    }
+
+    const nome = dados.pessoa.nome + " (mat. " + dados.pessoa.mat + ")";
+    const curso = dados.curso.nome + " - " + dados.curso.curso_id;
+
+    if (dados.status === "presente") {
+      resultadoEl.className = "resultado mostrar ok";
+      resultadoRotulo.textContent = "Presenca registrada";
+      resultadoDetalhe.textContent = curso;
+    } else if (dados.status === "inscrita_e_presente") {
+      resultadoEl.className = "resultado mostrar nova";
+      resultadoRotulo.textContent = "Inscricao automatica + presenca";
+      resultadoDetalhe.textContent =
+        "Voce foi inscrito no curso " + dados.curso.nome + " e sua presenca foi confirmada.";
+    } else if (dados.status === "repetida") {
+      resultadoEl.className = "resultado mostrar repetida";
+      resultadoRotulo.textContent = "Presenca ja registrada anteriormente";
+      resultadoDetalhe.textContent = curso;
+    }
+    resultadoNome.textContent = nome;
+    definirStatus("Leitura concluida.", "");
+    carregarHistorico();
+  }
+
+  btnExportar.addEventListener("click", async () => {
+    const cursoId = selectCurso.value;
+    if (!cursoId) return;
+    const resp = await fetch("/api/presencas?curso_id=" + encodeURIComponent(cursoId));
+    const presencas = await resp.json();
+    if (!presencas.length) return;
+    const linhas = ["matricula;nome;curso_id;curso;hora;inscrita_automaticamente"];
+    presencas.forEach((p) => {
+      linhas.push([p.mat, p.nome, p.curso_id, p.curso_nome, p.hora, p.auto_inscrita ? "sim" : "nao"].join(";"));
+    });
+    const blob = new Blob([linhas.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "presencas_tokenejpa_v03_" + Date.now() + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  btnResetPresencas.addEventListener("click", async () => {
+    if (!confirm("Isso apaga o historico de presencas de TODOS os eventos (mantem as inscricoes). Confirmar?")) {
+      return;
+    }
+    await fetch("/api/reset/presencas", { method: "POST" });
+    carregarHistorico();
+  });
+
+  btnOk.addEventListener("click", () => {
+    resultadoEl.classList.remove("mostrar");
+    pausadoNoResultado = false;
+    ultimoTextoLido = null;
+    definirStatus("Procurando QR Code...", "buscando");
+    cicloDeLeitura();
+  });
+
+  selectCurso.addEventListener("change", () => {
+    atualizarAvisoCurso();
+    carregarHistorico();
+  });
+
+  async function iniciar() {
+    if (!selectCurso.value) {
+      atualizarAvisoCurso();
+      return;
+    }
+    btnIniciar.disabled = true;
+    btnIniciar.textContent = "Preparando...";
+    definirStatus("Solicitando acesso a camera...", "buscando");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 960 } },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await video.play();
+    } catch (err) {
+      definirStatus("Nao foi possivel acessar a camera: " + err.message, "erro");
+      btnIniciar.disabled = false;
+      btnIniciar.textContent = "Tentar novamente";
+      return;
+    }
+
+    btnIniciar.style.display = "none";
+    escaneando = true;
+    definirStatus("Procurando QR Code...", "buscando");
+    requestAnimationFrame(function loopGuia() {
+      if (video.videoWidth) desenharGuia();
+      requestAnimationFrame(loopGuia);
+    });
+    cicloDeLeitura();
+  }
+
+  btnIniciar.addEventListener("click", iniciar);
+
+  carregarCursos();
+})();
+</script>
+
+</body>
+</html>

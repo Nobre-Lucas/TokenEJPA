@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TokenEJPA - Cadastro de Pessoas (PoC v03)</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0b0f14; color: #e6edf3;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh;
+  }
+  header { padding: 18px 16px 6px; text-align: center; }
+  header h1 { font-size: 1.1rem; margin: 0 0 4px; }
+  header p { font-size: 0.8rem; color: #9aa7b1; margin: 0; }
+  nav.voltar { font-size: 0.78rem; margin-bottom: 6px; }
+  nav.voltar a { color: #6bb0ff; text-decoration: none; }
+
+  .cartao {
+    max-width: 480px; width: calc(100% - 32px); margin: 12px 16px;
+    background: #131a21; border: 1px solid #232c35; border-radius: 12px;
+    padding: 18px;
+  }
+  label { display: block; font-size: 0.8rem; color: #9aa7b1; margin: 10px 0 4px; }
+  input {
+    width: 100%; background: #0b0f14; border: 1px solid #232c35; color: #e6edf3;
+    border-radius: 8px; padding: 10px 12px; font-size: 1rem;
+  }
+  button {
+    cursor: pointer; border: none; border-radius: 8px; font-weight: 600;
+    font-size: 0.95rem; padding: 10px 20px;
+  }
+  .btn-principal { background: #2563eb; color: #fff; width: 100%; margin-top: 14px; }
+  .btn-secundario { background: #232c35; color: #e6edf3; }
+  #erro { color: #ff9a9a; font-size: 0.82rem; min-height: 1.2em; margin-top: 8px; }
+
+  h2.secao {
+    font-size: 0.8rem; color: #9aa7b1; text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 22px 16px 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table th, table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #232c35; }
+  table th { color: #9aa7b1; font-weight: 600; font-size: 0.75rem; }
+  table td.mat { color: #6bb0ff; font-family: monospace; }
+  table button { padding: 4px 10px; font-size: 0.75rem; }
+  .vazio { font-size: 0.85rem; color: #6b7680; padding: 4px 0; }
+
+  #modalQr {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  #modalQr.mostrar { display: flex; }
+  #cartaoQr {
+    background: #131a21; border: 1px solid #232c35; border-radius: 14px;
+    padding: 20px; max-width: 340px; width: 100%; text-align: center;
+  }
+  #cartaoQr .nome { font-size: 1rem; font-weight: 700; margin: 4px 0 2px; }
+  #cartaoQr .sub { font-size: 0.82rem; color: #9aa7b1; margin: 0 0 2px; }
+  #cartaoQr .dados { font-size: 0.72rem; color: #6b7680; margin: 0 0 12px; line-height: 1.5; }
+  #canvasQr { background: #fff; border-radius: 8px; padding: 8px; }
+  #cartaoQr .acoes { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+
+  .aviso {
+    max-width: 480px; width: calc(100% - 32px); margin: 0 16px 28px;
+    font-size: 0.72rem; color: #6b7680; text-align: center; line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav class="voltar"><a href="/">&larr; inicio</a></nav>
+  <h1>TokenEJPA - Cadastro de Pessoas (PoC v03)</h1>
+  <p>Simula o cadastro de um servidor/magistrado no tribunal e gera o QR de identidade dele</p>
+</header>
+
+<div class="cartao">
+  <label for="campoNome">Nome completo (dados ficticios)</label>
+  <input type="text" id="campoNome" placeholder="ex.: Fulano de Tal" autocomplete="off">
+  <div id="erro"></div>
+  <button class="btn-principal" id="btnCadastrar">Cadastrar e gerar QR</button>
+  <div class="vazio" style="padding-top:10px;">
+    Matricula, RG, CPF e data de admissao sao gerados automaticamente pelo
+    sistema (ficticios) - so o nome e digitado.
+  </div>
+</div>
+
+<h2 class="secao">Pessoas ja cadastradas</h2>
+<div class="cartao" id="cartaoLista">
+  <table>
+    <thead><tr><th>Mat.</th><th>Nome</th><th></th></tr></thead>
+    <tbody id="corpoLista"></tbody>
+  </table>
+  <div class="vazio" id="vazioLista" style="display:none;">Nenhuma pessoa cadastrada ainda.</div>
+</div>
+
+<div class="aviso">
+  RG e CPF exibidos aqui sao gerados aleatoriamente (sem digito verificador
+  valido) apenas para preencher o layout do cracha simulado - nunca sao
+  dados reais de ninguem.
+</div>
+
+<div id="modalQr">
+  <div id="cartaoQr">
+    <div class="nome" id="qrNome">-</div>
+    <div class="sub" id="qrMatricula">-</div>
+    <div class="dados" id="qrDados">-</div>
+    <canvas id="canvasQr"></canvas>
+    <div class="acoes">
+      <button class="btn-secundario" id="btnBaixarQr">Baixar PNG</button>
+      <button class="btn-principal" id="btnFecharQr">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const campoNome = document.getElementById("campoNome");
+  const erro = document.getElementById("erro");
+  const btnCadastrar = document.getElementById("btnCadastrar");
+  const corpoLista = document.getElementById("corpoLista");
+  const vazioLista = document.getElementById("vazioLista");
+  const modalQr = document.getElementById("modalQr");
+  const canvasQr = document.getElementById("canvasQr");
+  const qrNome = document.getElementById("qrNome");
+  const qrMatricula = document.getElementById("qrMatricula");
+  const qrDados = document.getElementById("qrDados");
+  const btnBaixarQr = document.getElementById("btnBaixarQr");
+  const btnFecharQr = document.getElementById("btnFecharQr");
+
+  async function carregarLista() {
+    const resp = await fetch("/api/pessoas");
+    const pessoas = await resp.json();
+    corpoLista.innerHTML = "";
+    vazioLista.style.display = pessoas.length ? "none" : "block";
+    corpoLista.parentElement.style.display = pessoas.length ? "table" : "none";
+    pessoas.forEach((p) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td class='mat'>" + p.mat + "</td><td>" + p.nome + "</td><td></td>";
+      const btn = document.createElement("button");
+      btn.className = "btn-secundario";
+      btn.textContent = "Ver QR";
+      btn.addEventListener("click", () => mostrarQr(p));
+      tr.children[2].appendChild(btn);
+      corpoLista.appendChild(tr);
+    });
+  }
+
+  async function cadastrar() {
+    const nome = campoNome.value.trim();
+    if (!nome) {
+      erro.textContent = "Informe o nome.";
+      return;
+    }
+    erro.textContent = "";
+    btnCadastrar.disabled = true;
+    try {
+      const resp = await fetch("/api/pessoas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) {
+        erro.textContent = dados.erro || "Falha ao cadastrar.";
+        return;
+      }
+      campoNome.value = "";
+      await carregarLista();
+      mostrarQr(dados);
+    } catch (err) {
+      erro.textContent = "Nao foi possivel falar com o servidor: " + err.message;
+    } finally {
+      btnCadastrar.disabled = false;
+    }
+  }
+
+  function mostrarQr(pessoa) {
+    qrNome.textContent = pessoa.nome;
+    qrMatricula.textContent = "Matricula " + pessoa.mat;
+    if (pessoa.rg || pessoa.cpf || pessoa.admissao) {
+      qrDados.textContent = [
+        pessoa.rg ? "RG " + pessoa.rg : "",
+        pessoa.cpf ? "CPF " + pessoa.cpf : "",
+        pessoa.admissao ? "Admissao " + pessoa.admissao : "",
+      ].filter(Boolean).join(" - ");
+    } else {
+      qrDados.textContent = "";
+    }
+    QRCode.toCanvas(canvasQr, pessoa.token, { width: 260, margin: 2 }, function (err) {
+      if (err) qrDados.textContent += " (erro ao desenhar QR: " + err.message + ")";
+    });
+    modalQr.classList.add("mostrar");
+  }
+
+  function fecharQr() {
+    modalQr.classList.remove("mostrar");
+  }
+
+  function baixarQr() {
+    const nomeArquivo = (qrMatricula.textContent + "_" + qrNome.textContent)
+      .replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase();
+    const a = document.createElement("a");
+    a.href = canvasQr.toDataURL("image/png");
+    a.download = "tokenejpa_" + nomeArquivo + ".png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  btnCadastrar.addEventListener("click", cadastrar);
+  campoNome.addEventListener("keydown", (e) => { if (e.key === "Enter") cadastrar(); });
+  btnFecharQr.addEventListener("click", fecharQr);
+  btnBaixarQr.addEventListener("click", baixarQr);
+  modalQr.addEventListener("click", (e) => { if (e.target === modalQr) fecharQr(); });
+
+  carregarLista();
+})();
+</script>
+
+</body>
+</html>
